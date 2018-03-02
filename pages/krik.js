@@ -10,8 +10,8 @@ import {
 } from 'semantic-ui-react';
 import Head from 'next/head';
 import Link from 'next/link';
-import Krik from '../components/Krik';
-import { addKrik, kriks } from '../data/kriks';
+import moment from 'moment';
+import { kriks } from '../data/kriks';
 
 export default class Index extends Component {
   constructor(props) {
@@ -28,21 +28,8 @@ export default class Index extends Component {
     this.setState({ kriks });
   }
 
-  newKrik() {
-    if (this.state.input.length > 160) return;
-    addKrik({
-      time: new Date(),
-      name: 'Krik Master',
-      username: 'krikmaster2000',
-      avatar: 'https://api.adorable.io/avatars/100/km.png',
-      krik: this.state.input,
-      like: 0,
-      liked: false,
-    });
-    this.setState({ kriks, input: '' });
-  }
-
   render() {
+    const index = this.props.url.query.index;
     return (
       <div>
         <Head>
@@ -67,6 +54,37 @@ export default class Index extends Component {
             </a>
           </Link>
           <Card fluid>
+            <Card.Content>
+              <Image
+                src={kriks[index].avatar}
+                avatar
+                size="huge"
+                floated="right"
+              />
+              <span style={{ fontWeight: 'bold', marginRight: 10 }}>
+                {kriks[index].name}
+              </span>
+              <span>@{kriks[index].username}</span>
+              <span style={{ display: 'block', color: 'grey' }}>
+                {moment(kriks[index].time).calendar()}
+              </span>
+              <Card.Description style={{ whiteSpace: 'pre-line' }}>
+                {kriks[index].krik}
+              </Card.Description>
+            </Card.Content>
+            <Card.Content extra>
+              <a onClick={() => this.toggleLike(index)}>
+                <Icon
+                  name={kriks[index].liked ? 'heart' : 'empty heart'}
+                  style={kriks[index].liked ? { color: 'red' } : {}}
+                />
+                <span style={kriks[index].liked ? { color: 'red' } : {}}>
+                  {kriks[index].like} Like{kriks[index].like > 1 ? 's' : ''}
+                </span>
+              </a>
+            </Card.Content>
+          </Card>
+          <Card fluid>
             <Card.Content style={{ display: 'flex', flexDirection: 'row' }}>
               <Image
                 src="https://api.adorable.io/avatars/100/km.png"
@@ -79,7 +97,7 @@ export default class Index extends Component {
                   error={this.state.input.length > 160}
                   autoHeight
                   rows={2}
-                  placeholder="Tulis krikmu disini"
+                  placeholder="Tulis krik balasanmu disini"
                   value={this.state.input}
                   onInput={event =>
                     this.setState({ input: event.target.value })
@@ -103,14 +121,11 @@ export default class Index extends Component {
               >
                 {this.state.input.length} / 160
               </span>
-              <Button circular color="blue" onClick={() => this.newKrik()}>
-                Krik <Icon style={{ marginLeft: 5 }} name="send" />
+              <Button circular color="blue" onClick={() => alert('Fungsi ini kita bahas di pertemuan 2')}>
+                Reply <Icon style={{ marginLeft: 5 }} name="send" />
               </Button>
             </Card.Content>
           </Card>
-          {this.state.kriks.map((krik, i) => (
-            <Krik {...krik} index={i} toggleLike={this.toggleLike.bind(this)} />
-          ))}
         </Container>
       </div>
     );
