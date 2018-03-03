@@ -29,7 +29,7 @@ export default class Index extends Component {
   }
 
   newKrik() {
-    if (this.state.input.length > 160) return;
+    if (this.state.input.length > 160 || this.state.input.length === 0) return;
     addKrik({
       time: new Date(),
       name: 'Krik Master',
