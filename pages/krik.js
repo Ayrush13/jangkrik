@@ -7,29 +7,100 @@ import {
   Image,
   Form,
   Button,
+  Loader,
 } from 'semantic-ui-react';
 import Head from 'next/head';
 import Link from 'next/link';
+import firebase from 'firebase';
+import initFirebase from '../firebase';
 import moment from 'moment';
-import { kriks } from '../data/kriks';
+import Krik from '../components/Krik';
 
 export default class Index extends Component {
   constructor(props) {
     super(props);
     this.state = {
       input: '',
-      kriks,
+      loading: false,
+      krik: null,
+      replies: [],
     };
   }
 
-  toggleLike(index) {
-    kriks[index].liked = !kriks[index].liked;
-    kriks[index].like += kriks[index].liked ? 1 : -1;
-    this.setState({ kriks });
+  componentWillMount() {
+    initFirebase();
+
+    this.db = firebase.database().ref('kriks/' + this.props.url.query.id);
+    this.db.on('value', snapshot => {
+      this.showKrik(snapshot.val());
+    });
+  }
+
+  componentWillUnmount() {
+    this.db.off('value');
+  }
+
+  showKrik(snapshot) {
+    let replies = [];
+    if (snapshot.replies) {
+      replies = Object.entries(snapshot.replies).map(item =>
+        Object.assign({}, { key: item[0] }, item[1]),
+      );
+      delete snapshot.replies;
+    }
+
+    this.setState({ krik: snapshot, replies });
+  }
+
+  toggleLike() {
+    const id = this.props.url.query.id;
+    const { like, liked } = this.state.krik;
+    firebase
+      .database()
+      .ref('kriks/' + id + '/')
+      .update({
+        like: liked ? like - 1 : like + 1,
+        liked: !liked,
+      });
+  }
+
+  toggleLikeReply(id, like, liked) {
+    const idKrik = this.props.url.query.id;
+    firebase
+      .database()
+      .ref('kriks/' + idKrik + '/replies/' + id)
+      .update({
+        like: liked ? like - 1 : like + 1,
+        liked: !liked,
+      });
+  }
+
+  async newKrikReply() {
+    // check jumlah karakter
+    if (this.state.input.length > 160 || this.state.input.length === 0) return;
+
+    // ganti jadi loading
+    this.setState({ loading: true });
+
+    const newKrik = firebase
+      .database()
+      .ref('kriks/' + this.props.url.query.id + '/replies')
+      .push();
+    await newKrik.set({
+      time: new Date().getTime(),
+      name: 'Krik Master 7777',
+      username: 'krikmaster7777',
+      avatar: 'https://api.adorable.io/avatars/100/asdasd.png',
+      krik: this.state.input,
+      like: 0,
+      liked: false,
+    });
+
+    // set state daftar kriks sama kosongkan input
+    this.setState({ input: '', loading: false });
   }
 
   render() {
-    const index = this.props.url.query.index;
     return (
       <div>
         <Head>
@@ -53,79 +124,70 @@ export default class Index extends Component {
               </Header>
             </a>
           </Link>
-          <Card fluid>
-            <Card.Content>
-              <Image
-                src={kriks[index].avatar}
-                avatar
-                size="huge"
-                floated="right"
-              />
-              <span style={{ fontWeight: 'bold', marginRight: 10 }}>
-                {kriks[index].name}
-              </span>
-              <span>@{kriks[index].username}</span>
-              <span style={{ display: 'block', color: 'grey' }}>
-                {moment(kriks[index].time).calendar()}
-              </span>
-              <Card.Description style={{ whiteSpace: 'pre-line' }}>
-                {kriks[index].krik}
-              </Card.Description>
-            </Card.Content>
-            <Card.Content extra>
-              <a onClick={() => this.toggleLike(index)}>
-                <Icon
-                  name={kriks[index].liked ? 'heart' : 'empty heart'}
-                  style={kriks[index].liked ? { color: 'red' } : {}}
+          {this.state.krik === null && <Loader active inline="centered" />}
+          {this.state.krik !== null && (
+            <Krik
+              isReply
+              {...this.state.krik}
+              toggleLike={() => this.toggleLike()}
+            />
+          )}
+          {this.state.replies.map(krik => (
+            <Krik
+              isReply
+              id={krik.key}
+              {...krik}
+              toggleLike={this.toggleLikeReply.bind(this)}
+            />
+          ))}
+          {this.state.krik !== null && (
+            <Card fluid>
+              <Card.Content style={{ display: 'flex', flexDirection: 'row' }}>
+                <Image
+                  src="https://api.adorable.io/avatars/100/asdasd.png"
+                  avatar
+                  size="huge"
+                  floated="left"
                 />
-                <span style={kriks[index].liked ? { color: 'red' } : {}}>
-                  {kriks[index].like} Like{kriks[index].like > 1 ? 's' : ''}
-                </span>
-              </a>
-            </Card.Content>
-          </Card>
-          <Card fluid>
-            <Card.Content style={{ display: 'flex', flexDirection: 'row' }}>
-              <Image
-                src="https://api.adorable.io/avatars/100/km.png"
-                avatar
-                size="huge"
-                floated="left"
-              />
-              <Form style={{ flex: 1 }}>
-                <Form.TextArea
-                  error={this.state.input.length > 160}
-                  autoHeight
-                  rows={2}
-                  placeholder="Tulis krik balasanmu disini"
-                  value={this.state.input}
-                  onInput={event =>
-                    this.setState({ input: event.target.value })
-                  }
-                />
-              </Form>
-            </Card.Content>
-            <Card.Content
-              extra
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-end',
-              }}
-            >
-              <span
+                <Form style={{ flex: 1 }} loading={this.state.loading}>
+                  <Form.TextArea
+                    error={this.state.input.length > 160}
+                    autoHeight
+                    rows={2}
+                    placeholder="Tulis krik balasanmu disini"
+                    value={this.state.input}
+                    onInput={event =>
+                      this.setState({ input: event.target.value })
+                    }
+                  />
+                </Form>
+              </Card.Content>
+              <Card.Content
+                extra
                 style={{
-                  marginRight: 10,
-                  color: this.state.input.length > 160 ? 'red' : 'black',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
                 }}
               >
-                {this.state.input.length} / 160
-              </span>
-              <Button circular color="blue" onClick={() => alert('Fungsi ini kita bahas di pertemuan 2')}>
-                Reply <Icon style={{ marginLeft: 5 }} name="send" />
-              </Button>
-            </Card.Content>
-          </Card>
+                <span
+                  style={{
+                    marginRight: 10,
+                    color: this.state.input.length > 160 ? 'red' : 'black',
+                  }}
+                >
+                  {this.state.input.length} / 160
+                </span>
+                <Button
+                  circular
+                  color="blue"
+                  onClick={() => this.newKrikReply()}
+                >
+                  Reply <Icon style={{ marginLeft: 5 }} name="send" />
+                </Button>
+              </Card.Content>
+            </Card>
+          )}
         </Container>
       </div>
     );

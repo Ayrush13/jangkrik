@@ -7,31 +7,60 @@ import {
   Image,
   Form,
   Button,
+  Loader,
 } from 'semantic-ui-react';
 import Head from 'next/head';
 import Link from 'next/link';
+import firebase from 'firebase';
+import initFirebase from '../firebase';
 import Krik from '../components/Krik';
-import { addKrik, kriks } from '../data/kriks';
 
 export default class Index extends Component {
   constructor(props) {
     super(props);
+
     this.state = {
       input: '',
-      kriks,
+      kriks: [],
+      loading: false,
+      gettingData: true,
     };
   }
 
-  toggleLike(index) {
-    kriks[index].liked = !kriks[index].liked;
-    kriks[index].like += kriks[index].liked ? 1 : -1;
-    this.setState({ kriks });
+  componentDidMount() {
+    initFirebase();
+
+    this.db = firebase.database().ref('kriks');
+    this.db.on('value', snapshot => {
+      this.showKriks(snapshot.val());
+    });
   }
 
-  newKrik() {
+  componentWillUnmount() {
+    this.db.off('value');
+  }
+
+  showKriks(snapshot) {
+    const kriks = Object.entries(snapshot)
+      .map(item => Object.assign({}, { key: item[0] }, item[1]))
+      .reverse();
+
+    this.setState({ kriks, gettingData: false });
+  }
+
+  async newKrik() {
+    // check jumlah karakter
     if (this.state.input.length > 160 || this.state.input.length === 0) return;
-    addKrik({
-      time: new Date(),
+
+    // ganti jadi loading
+    this.setState({ loading: true });
+
+    const newKrik = firebase
+      .database()
+      .ref('kriks/')
+      .push();
+    await newKrik.set({
+      time: new Date().getTime(),
       name: 'Krik Master',
       username: 'krikmaster2000',
       avatar: 'https://api.adorable.io/avatars/100/km.png',
@@ -39,7 +68,19 @@ export default class Index extends Component {
       like: 0,
       liked: false,
     });
-    this.setState({ kriks, input: '' });
+
+    // set state daftar kriks sama kosongkan input
+    this.setState({ input: '', loading: false });
+  }
+
+  toggleLike(id, like, liked) {
+    firebase
+      .database()
+      .ref('kriks/' + id + '/')
+      .update({
+        like: liked ? like - 1 : like + 1,
+        liked: !liked,
+      });
   }
 
   render() {
@@ -74,7 +115,7 @@ export default class Index extends Component {
                 size="huge"
                 floated="left"
               />
-              <Form style={{ flex: 1 }}>
+              <Form style={{ flex: 1 }} loading={this.state.loading}>
                 <Form.TextArea
                   error={this.state.input.length > 160}
                   autoHeight
@@ -108,8 +149,13 @@ export default class Index extends Component {
               </Button>
             </Card.Content>
           </Card>
-          {this.state.kriks.map((krik, i) => (
-            <Krik {...krik} index={i} toggleLike={this.toggleLike.bind(this)} />
+          {this.state.gettingData && <Loader active inline="centered" />}
+          {this.state.kriks.map(krik => (
+            <Krik
+              id={krik.key}
+              {...krik}
+              toggleLike={this.toggleLike.bind(this)}
+            />
           ))}
         </Container>
       </div>
